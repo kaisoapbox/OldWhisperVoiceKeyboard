@@ -10,7 +10,7 @@ android {
     compileSdk 33
 
     defaultConfig {
-        applicationId 'com.mjm.WhisperVoiceKeyboard'
+        applicationId 'kaizo.co.WhisperVoiceKeyboard'
         minSdk 29
         targetSdk 33
         versionCode 3

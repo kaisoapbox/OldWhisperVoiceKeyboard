@@ -5,6 +5,8 @@ import android.os.Bundle;
 
 import com.example.WhisperVoiceKeyboard.R;
 
+import java.util.Objects;
+
 
 public class Preferences extends AppCompatActivity{
     @Override
@@ -14,7 +16,7 @@ public class Preferences extends AppCompatActivity{
 
         // below line is to change
         // the title of our action bar.
-        getSupportActionBar().setTitle("Preferences");
+        Objects.requireNonNull(getSupportActionBar()).setTitle("Preferences");
 
         // below line is used to check if
         // frame layout is empty or not.
