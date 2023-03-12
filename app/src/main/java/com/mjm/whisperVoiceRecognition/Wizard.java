@@ -20,6 +20,7 @@ public class Wizard extends AppCompatActivity {
 
         Button btnEnableInputMethod = findViewById(R.id.btnEnableInputMethod);
         Button btnGrantMicrophonePermission = findViewById(R.id.btnGrantMicrophonePermission);
+        Button btnConfigureSettings = findViewById(R.id.btnConfigurePreferences);
         Button btnExit = findViewById(R.id.btnExit);
 
         btnEnableInputMethod.setOnClickListener(v -> {
@@ -29,6 +30,11 @@ public class Wizard extends AppCompatActivity {
 
         btnGrantMicrophonePermission.setOnClickListener(v -> {
             ActivityCompat.requestPermissions(Wizard.this, new String[]{Manifest.permission.RECORD_AUDIO}, 1);
+        });
+
+        btnConfigureSettings.setOnClickListener(v -> {
+            Intent i = new Intent(Wizard.this, Preferences.class);
+            startActivity(i);
         });
 
         btnExit.setOnClickListener(v -> {

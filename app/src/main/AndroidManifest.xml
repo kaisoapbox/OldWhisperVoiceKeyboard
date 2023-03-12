@@ -25,6 +25,18 @@
                 android:value="" />
         </activity>
 
+        <activity
+            android:name="com.mjm.whisperVoiceRecognition.Preferences"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.PREFERENCE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.preferences"
+                android:value="" />
+        </activity>
+
         <service
             android:name="com.mjm.whisperVoiceRecognition.VoiceKeyboardInputMethodService"
             android:exported="true"

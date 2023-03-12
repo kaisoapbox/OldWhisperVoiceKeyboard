@@ -5,9 +5,12 @@ import static android.Manifest.permission.RECORD_AUDIO;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
+import android.graphics.Color;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Handler;
@@ -25,6 +28,7 @@ import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.preference.PreferenceManager;
 
 import com.example.WhisperVoiceKeyboard.R;
 
@@ -37,35 +41,37 @@ import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class VoiceKeyboardInputMethodService extends InputMethodService {
 
     private Interpreter _whisperInterpreter;
     private Dictionary _dictionary;
-
+    private SharedPreferences sharedPref;
     private static final String WHISPER_TFLITE = "whisper.tflite";
 
     private static final boolean LOG_AND_DRAW = false;
-
 
     @Override
     public void onCreate() {
 
         super.onCreate();
 
-
         try {
+            sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+
             Vocab vocab = ExtractVocab.extractVocab(getAssets().open("filters_vocab_gen.bin"));
             HashMap<String, String> phraseMappings = new HashMap<>();
-
-
             _dictionary = new Dictionary(vocab, phraseMappings);
             MappedByteBuffer model = loadWhisperModel(getAssets());
 
             Interpreter.Options options = new Interpreter.Options();
 
             options.setUseXNNPACK(true);
-            options.setNumThreads(8);
+            options.setNumThreads(sharedPref.getInt("threads", 8));
 
             _whisperInterpreter = new Interpreter(model, options);
 
@@ -154,23 +160,79 @@ public class VoiceKeyboardInputMethodService extends InputMethodService {
 
         final MicrophoneResolver microphoneResolver = new MicrophoneResolver((AudioManager) getSystemService(Context.AUDIO_SERVICE));
 
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        final float[] timeElapsed = new float[1];
+        class Updater extends TimerTask {
+            private final Button subject;
+            private final Resources resources = getResources();
+
+            public Updater(Button subject) {
+                this.subject = subject;
+            }
+
+            @Override
+            public void run() {
+                subject.post(new Runnable() {
+
+                    public void run() {
+                        timeElapsed[0] += 0.1;
+                        if (timeElapsed[0] < 25) {
+                            recordButton.setTextColor(Color.parseColor("#ffffff"));
+                        } else {
+                            recordButton.setTextColor(Color.parseColor("#ff0000"));
+                        }
+                        if (timeElapsed[0] >= sharedPref.getInt("delay", 5)) {
+                            recordButton.setText(resources.getString(R.string.VoiceKeyboardService_transcribingLabel));
+                            timeElapsed[0] = 0;
+                            executor.submit(() -> {
+                                Optional<AudioDeviceConfig> microphone = microphoneResolver.resolveMicrophone();
+                                Optional<float[]> byteBuffer = RustLib.endRec();
+                                microphone.ifPresent(RustLib::startRecording);
+                                if (byteBuffer.isPresent()) {
+                                    String transcribeAudio = transcribeAudio(byteBuffer.get());
+                                    String transcribed = transcribeAudio.trim() + " ";
+                                    getCurrentInputConnection().commitText(transcribed, 1);
+                                    if (LOG_AND_DRAW) {
+                                        SpectrogramToFile.save(byteBuffer.get(), getFilesDir().getAbsolutePath());
+                                    }
+                                }
+                            });
+                        } else {
+                            if (recordButton.isChecked()) {
+                                recordButton.setText(String.format(resources.getString(R.string.VoiceKeyboardService_timeFormat), timeElapsed[0]));
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        final Timer timing = new Timer();
+        final TimerTask[] timerTask = new TimerTask[1];
+
         recordButton.setOnCheckedChangeListener((button, checked) -> {
+            if (timerTask[0] != null) timerTask[0].cancel();
+            timeElapsed[0] = 0;
             Optional<AudioDeviceConfig> microphone = microphoneResolver.resolveMicrophone();
             if (checked && microphone.isPresent()) {
                 AudioDeviceConfig foundMicrophone = microphone.get();
                 RustLib.startRecording(foundMicrophone);
                 cancelButton.setVisibility(View.VISIBLE);
+                timerTask[0] = new Updater(recordButton);
+                timing.schedule(timerTask[0], 100, 100);
             } else {
                 cancelButton.setVisibility(View.GONE);
-                Optional<float[]> byteBuffer = RustLib.endRec();
-                if (byteBuffer.isPresent()) {
-                    String transcribeAudio = transcribeAudio(byteBuffer.get());
-                    String transcribed = transcribeAudio.trim() + " ";
-                    getCurrentInputConnection().commitText(transcribed, 1);
-                    if (LOG_AND_DRAW) {
-                        SpectrogramToFile.save(byteBuffer.get(), getFilesDir().getAbsolutePath());
+                executor.submit(() -> {
+                    Optional<float[]> byteBuffer = RustLib.endRec();
+                    if (byteBuffer.isPresent()) {
+                        String transcribeAudio = transcribeAudio(byteBuffer.get());
+                        String transcribed = transcribeAudio.trim() + " ";
+                        getCurrentInputConnection().commitText(transcribed, 1);
+                        if (LOG_AND_DRAW) {
+                            SpectrogramToFile.save(byteBuffer.get(), getFilesDir().getAbsolutePath());
+                        }
                     }
-                }
+                });
             }
         });
 

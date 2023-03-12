@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    >
+    <SeekBarPreference
+        android:key="threads"
+        android:title="@string/num_threads"
+        android:summary="@string/threads_summary"
+        android:defaultValue="8"
+        android:min="1"
+        android:max="16"
+        app:seekBarIncrement="1"
+        app:showSeekBarValue="true"
+        />
+    <SeekBarPreference
+        android:key="delay"
+        android:title="@string/delay_seconds"
+        android:summary="@string/delay_summary"
+        android:defaultValue="10"
+        android:min="5"
+        android:max="30"
+        app:seekBarIncrement="1"
+        app:showSeekBarValue="true"
+        />
+</PreferenceScreen>
